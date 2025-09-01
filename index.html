@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>資料轉PDF</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-2xl border-t-8 border-indigo-500">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">資料轉PDF工具</h1>
+        
+        <form id="pdf-form" class="space-y-6">
+            <div class="space-y-2">
+                <label for="text-input" class="block text-sm font-medium text-gray-700">輸入文字</label>
+                <textarea id="text-input" name="text-input" rows="8" placeholder="請在此輸入您想轉換成 PDF 的文字..." class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"></textarea>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <div class="flex-grow border-t border-gray-300"></div>
+                <div class="text-sm font-medium text-gray-500">或</div>
+                <div class="flex-grow border-t border-gray-300"></div>
+            </div>
+
+            <div class="space-y-2">
+                <label for="file-input" class="block text-sm font-medium text-gray-700">上傳檔案 (限 .txt)</label>
+                <input type="file" id="file-input" name="file-input" accept=".txt" class="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-full file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-indigo-50 file:text-indigo-700
+                    hover:file:bg-indigo-100 transition-colors duration-200">
+            </div>
+
+            <div class="flex justify-center">
+                <button type="submit" class="px-6 py-2.5 bg-indigo-600 text-white font-semibold rounded-full shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-transform duration-200 transform hover:scale-105">
+                    產生PDF
+                </button>
+            </div>
+            
+            <div id="loading-message" class="hidden text-center text-sm text-gray-600">
+                <p>正在產生PDF檔案，請稍候...</p>
+            </div>
+
+            <div id="download-section" class="hidden text-center mt-6">
+                <p class="mb-4 text-green-600 font-semibold">PDF已成功建立！</p>
+                <a id="download-link" href="#" class="inline-block px-6 py-2 bg-green-500 text-white font-semibold rounded-full shadow-md hover:bg-green-600 transition-colors duration-200" download="output.pdf">
+                    下載 PDF
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // === 修正：設定後端伺服器的完整網址 ===
+        // 請將此網址替換為您執行 app.py 的實際網址。
+        // 在一般情況下，如果後端伺服器運行在本地，這個網址通常是 
+        // http://127.0.0.1:5000。
+        const BACKEND_URL = 'http://127.0.0.1:5000';
+
+        document.getElementById('pdf-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const form = e.target;
+            const formData = new FormData(form);
+            const textInput = document.getElementById('text-input').value;
+            const fileInput = document.getElementById('file-input').files[0];
+
+            // 檢查是否提供了資料
+            if (!textInput && !fileInput) {
+                alert('請輸入文字或上傳檔案。');
+                return;
+            }
+
+            // 顯示載入中訊息並隱藏其他區塊
+            document.getElementById('loading-message').classList.remove('hidden');
+            document.getElementById('download-section').classList.add('hidden');
+            form.querySelector('button').disabled = true;
+
+            try {
+                // 發送請求到後端
+                // === 修正：使用完整的後端網址 ===
+                const response = await fetch(BACKEND_URL + '/generate-pdf', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    // 成功時，建立一個 Blob URL 來下載檔案
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const downloadLink = document.getElementById('download-link');
+                    downloadLink.href = url;
+                    
+                    // 顯示下載區塊
+                    document.getElementById('download-section').classList.remove('hidden');
+                } else {
+                    // 處理錯誤
+                    const errorText = await response.text();
+                    alert('產生PDF時發生錯誤：' + errorText);
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                alert('連線伺服器時發生錯誤。');
+            } finally {
+                // 完成後，隱藏載入中訊息並啟用按鈕
+                document.getElementById('loading-message').classList.add('hidden');
+                form.querySelector('button').disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
