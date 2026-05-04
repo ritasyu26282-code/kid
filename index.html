@@ -1,118 +1,463 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>資料轉PDF</title>
+    <title>存量管制庫存量試算</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            background-color: #f3f4f6;
+            font-family: "PingFang TC", "Heiti TC", "Microsoft JhengHei", sans-serif;
+            overflow-x: hidden;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .input-field {
+            transition: all 0.2s;
+        }
+        .input-field:focus {
+            border-color: #3b82f6;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        .single-row-grid {
+            display: flex;
+            gap: 0.3rem;
+            align-items: flex-end;
+            flex-wrap: nowrap;
+        }
+        .single-row-grid > div {
+            flex: 1;
+            min-width: 0;
+        }
+        .readonly-field {
+            background-color: #f9fafb;
+            color: #6b7280;
+            cursor: not-allowed;
+        }
+        .section-label {
+            writing-mode: vertical-lr;
+            text-orientation: upright;
+            padding: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            color: white;
+            border-radius: 4px 0 0 4px;
+        }
+        .block-title {
+            position: relative;
+            padding-left: 1rem;
+            border-left: 4px solid #3b82f6;
+        }
+        /* Tab Styles */
+        .tab-btn {
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        .tab-btn.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.05);
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
-    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-2xl border-t-8 border-indigo-500">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">資料轉PDF工具</h1>
-        
-        <form id="pdf-form" class="space-y-6">
-            <div class="space-y-2">
-                <label for="text-input" class="block text-sm font-medium text-gray-700">輸入文字</label>
-                <textarea id="text-input" name="text-input" rows="8" placeholder="請在此輸入您想轉換成 PDF 的文字..." class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"></textarea>
+<body class="p-2 space-y-4 pb-10">
+    <header class="mb-4">
+        <h1 class="text-xl font-bold text-gray-800 text-center">存量管制庫存量試算</h1>
+    </header>
+
+    <!-- 分頁導覽列 -->
+    <div class="flex border-b border-gray-200 mb-4 bg-white rounded-t-lg sticky top-0 z-10 shadow-sm">
+        <button onclick="switchTab('tab1')" id="btn_tab1" class="tab-btn active flex-1">試算主頁 (正向)</button>
+        <button onclick="switchTab('tab2')" id="btn_tab2" class="tab-btn flex-1">逆向推算 (區塊二)</button>
+    </div>
+
+    <!-- 分頁內容 1: 主試算區 -->
+    <div id="tab1" class="space-y-8">
+        <!-- 第一個區塊：正向計算 -->
+        <section id="block_1" class="space-y-2">
+            <div class="block-title mb-4">
+                <h2 class="text-lg font-bold text-gray-700">區塊一：正向試算 (由用量推算基準)</h2>
             </div>
 
-            <div class="flex items-center space-x-4">
-                <div class="flex-grow border-t border-gray-300"></div>
-                <div class="text-sm font-medium text-gray-500">或</div>
-                <div class="flex-grow border-t border-gray-300"></div>
+            <div class="card overflow-hidden">
+                <div class="flex border-b border-gray-100">
+                    <div class="section-label bg-gray-400">調整前</div>
+                    <div class="p-3 w-full">
+                        <div class="single-row-grid">
+                            <div style="flex: 0.5;">
+                                <label class="block text-[10px] font-bold text-gray-400 mb-1">管制別</label>
+                                <select id="b1_pre_type" onchange="syncAndCalculate('b1', 'pre')" class="input-field w-full px-1 py-1.5 border border-gray-300 rounded bg-white text-xs text-center">
+                                    <option value="A">A</option>
+                                    <option value="B">B</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 mb-1">月用量</label>
+                                <input type="number" id="b1_pre_usage" placeholder="0" oninput="syncAndCalculate('b1', 'pre')" class="input-field w-full px-1 py-1.5 border border-gray-300 rounded text-xs text-center">
+                            </div>
+                            <div style="flex: 0.7;">
+                                <label class="block text-[10px] font-bold text-gray-400 mb-1">交貨天數</label>
+                                <input type="number" id="b1_pre_lead" value="34" oninput="handleLeadChange('b1', 'pre')" class="input-field w-full px-1 py-1.5 border border-gray-300 rounded text-xs text-center">
+                            </div>
+                            <div style="flex: 0.7;">
+                                <label class="block text-[10px] font-bold text-gray-400 mb-1">安全天數</label>
+                                <input type="number" id="b1_pre_safety" oninput="syncAndCalculate('b1', 'pre')" class="input-field w-full px-1 py-1.5 border border-gray-300 rounded text-xs text-center">
+                            </div>
+                            <div style="flex: 0.7;">
+                                <label class="block text-[10px] font-bold text-gray-400 mb-1">請購天數</label>
+                                <input type="number" id="b1_pre_cycle" value="30" oninput="syncAndCalculate('b1', 'pre')" class="input-field w-full px-1 py-1.5 border border-gray-300 rounded text-xs text-center">
+                            </div>
+                            <div style="flex: 0.7;">
+                                <label class="block text-[10px] font-bold text-gray-400 mb-1">包裝量</label>
+                                <input type="number" id="b1_pre_pkg" value="1" oninput="syncAndCalculate('b1', 'pre')" class="input-field w-full px-1 py-1.5 border border-gray-300 rounded text-xs text-center">
+                            </div>
+                            <div style="flex: 0.7;">
+                                <label class="block text-[10px] font-bold text-gray-400 mb-1">經濟量</label>
+                                <input type="number" id="b1_pre_moq" value="0" oninput="syncAndCalculate('b1', 'pre')" class="input-field w-full px-1 py-1.5 border border-gray-300 rounded text-xs text-center">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-blue-400 mb-1">請購點</label>
+                                <input type="number" id="b1_pre_point" readonly class="w-full px-1 py-1.5 border border-blue-100 rounded text-xs text-center readonly-field font-bold text-blue-600">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-blue-400 mb-1">最高庫存</label>
+                                <input type="number" id="b1_pre_max" readonly class="w-full px-1 py-1.5 border border-blue-100 rounded text-xs text-center readonly-field font-bold text-blue-600">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex">
+                    <div class="section-label bg-blue-500">調整後</div>
+                    <div class="p-3 w-full bg-blue-50">
+                        <div class="single-row-grid">
+                            <div style="flex: 0.5;">
+                                <select id="b1_post_type" onchange="calculate('b1', 'post')" class="input-field w-full px-1 py-1.5 border border-blue-300 rounded bg-white text-xs text-center">
+                                    <option value="A">A</option>
+                                    <option value="B">B</option>
+                                </select>
+                            </div>
+                            <div>
+                                <input type="number" id="b1_post_usage" placeholder="0" oninput="calculate('b1', 'post')" class="input-field w-full px-1 py-1.5 border border-blue-300 rounded text-xs text-center">
+                            </div>
+                            <div style="flex: 0.7;">
+                                <input type="number" id="b1_post_lead" oninput="handleLeadChange('b1', 'post')" class="input-field w-full px-1 py-1.5 border border-blue-300 rounded text-xs text-center">
+                            </div>
+                            <div style="flex: 0.7;">
+                                <input type="number" id="b1_post_safety" oninput="calculate('b1', 'post')" class="input-field w-full px-1 py-1.5 border border-blue-300 rounded text-xs text-center">
+                            </div>
+                            <div style="flex: 0.7;">
+                                <input type="number" id="b1_post_cycle" oninput="calculate('b1', 'post')" class="input-field w-full px-1 py-1.5 border border-blue-300 rounded text-xs text-center">
+                            </div>
+                            <div style="flex: 0.7;">
+                                <input type="number" id="b1_post_pkg" oninput="calculate('b1', 'post')" class="input-field w-full px-1 py-1.5 border border-blue-300 rounded text-xs text-center">
+                            </div>
+                            <div style="flex: 0.7;">
+                                <input type="number" id="b1_post_moq" oninput="calculate('b1', 'post')" class="input-field w-full px-1 py-1.5 border border-blue-300 rounded text-xs text-center">
+                            </div>
+                            <div>
+                                <input type="number" id="b1_post_point" readonly class="w-full px-1 py-1.5 border border-blue-200 rounded text-xs text-center readonly-field font-bold text-blue-600">
+                            </div>
+                            <div>
+                                <input type="number" id="b1_post_max" readonly class="w-full px-1 py-1.5 border border-blue-200 rounded text-xs text-center readonly-field font-bold text-blue-600">
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-
-            <div class="space-y-2">
-                <label for="file-input" class="block text-sm font-medium text-gray-700">上傳檔案 (限 .txt)</label>
-                <input type="file" id="file-input" name="file-input" accept=".txt" class="block w-full text-sm text-gray-500
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-full file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-indigo-50 file:text-indigo-700
-                    hover:file:bg-indigo-100 transition-colors duration-200">
-            </div>
-
-            <div class="flex justify-center">
-                <button type="submit" class="px-6 py-2.5 bg-indigo-600 text-white font-semibold rounded-full shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-transform duration-200 transform hover:scale-105">
-                    產生PDF
+            <div class="flex items-center justify-between px-2 min-h-[3.5rem] gap-4">
+                <div id="b1_alert_container" class="flex-grow flex items-center"></div>
+                <button onclick="resetInputs('b1')" class="flex-shrink-0 px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition font-bold text-sm shadow-md">
+                    清除數值
                 </button>
             </div>
-            
-            <div id="loading-message" class="hidden text-center text-sm text-gray-600">
-                <p>正在產生PDF檔案，請稍候...</p>
+        </section>
+
+        <!-- 庫存與在途量試算區塊 -->
+        <section id="stock_calculator" class="space-y-2">
+            <div class="block-title mb-4 border-amber-500">
+                <h2 class="text-lg font-bold text-gray-700">區塊：庫存與在途量試算 (以區塊一為準)</h2>
+            </div>
+            <div class="card p-4 bg-amber-50 border border-amber-200">
+                <div class="grid grid-cols-2 md:grid-cols-7 gap-3 items-end">
+                    <div class="col-span-1">
+                        <label class="block text-[11px] font-bold text-amber-800 mb-1">目前庫存量</label>
+                        <input type="number" id="curr_stock" placeholder="0" oninput="calculateOrder()" class="input-field w-full px-2 py-2 border border-amber-300 rounded bg-white text-sm text-center">
+                    </div>
+                    <div class="col-span-1">
+                        <label class="block text-[11px] font-bold text-amber-600 mb-1 text-center">在途量 1</label>
+                        <input type="number" id="on_order_1" placeholder="0" oninput="calculateOrder()" class="input-field w-full px-2 py-2 border border-amber-200 rounded bg-white text-sm text-center">
+                    </div>
+                    <div class="col-span-1">
+                        <label class="block text-[11px] font-bold text-amber-600 mb-1 text-center">在途量 2</label>
+                        <input type="number" id="on_order_2" placeholder="0" oninput="calculateOrder()" class="input-field w-full px-2 py-2 border border-amber-200 rounded bg-white text-sm text-center">
+                    </div>
+                    <div class="col-span-1">
+                        <label class="block text-[11px] font-bold text-amber-600 mb-1 text-center">在途量 3</label>
+                        <input type="number" id="on_order_3" placeholder="0" oninput="calculateOrder()" class="input-field w-full px-2 py-2 border border-amber-200 rounded bg-white text-sm text-center">
+                    </div>
+                    <div class="col-span-1">
+                        <label class="block text-[11px] font-bold text-gray-500 mb-1">總可用量</label>
+                        <input type="number" id="total_avail" readonly class="w-full px-2 py-2 border border-gray-200 rounded text-sm text-center readonly-field font-bold">
+                    </div>
+                    <div class="col-span-2">
+                        <div id="order_suggestion" class="h-10 flex items-center px-4 rounded font-bold text-xs"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- 分頁內容 2: 逆向推算 -->
+    <div id="tab2" class="hidden space-y-4">
+        <section id="block_reverse" class="space-y-4">
+            <div class="block-title mb-4 border-purple-500">
+                <h2 class="text-lg font-bold text-gray-700">區塊二：逆向試算 (由可用量反推月用量)</h2>
             </div>
 
-            <div id="download-section" class="hidden text-center mt-6">
-                <p class="mb-4 text-green-600 font-semibold">PDF已成功建立！</p>
-                <a id="download-link" href="#" class="inline-block px-6 py-2 bg-green-500 text-white font-semibold rounded-full shadow-md hover:bg-green-600 transition-colors duration-200" download="output.pdf">
-                    下載 PDF
-                </a>
+            <!-- 輸入層：庫存情況 -->
+            <div class="card p-4 bg-purple-50 border border-purple-100">
+                <p class="text-xs font-bold text-purple-600 mb-3">STEP 1. 輸入當前庫存水準</p>
+                <div class="grid grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 mb-1">目前庫存</label>
+                        <input type="number" id="rev_stock" placeholder="0" oninput="reverseCalculate()" class="input-field w-full px-2 py-1.5 border border-purple-200 rounded text-xs text-center">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 mb-1">在途總量</label>
+                        <input type="number" id="rev_transit" placeholder="0" oninput="reverseCalculate()" class="input-field w-full px-2 py-1.5 border border-purple-200 rounded text-xs text-center">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-purple-700 mb-1">總可用量</label>
+                        <input type="number" id="rev_total" readonly class="w-full px-2 py-1.5 border border-purple-100 rounded text-xs text-center readonly-field font-bold text-purple-800">
+                    </div>
+                    <div class="flex items-end pb-1">
+                        <span class="text-[10px] text-gray-400 font-medium">← 將作為目標請購點</span>
+                    </div>
+                </div>
             </div>
-        </form>
+
+            <!-- 計算層：逆向推導結果 -->
+            <div class="card overflow-hidden border border-emerald-200">
+                <div class="flex">
+                    <div class="section-label bg-emerald-500">反推結果</div>
+                    <div class="p-3 w-full bg-emerald-50/50">
+                        <p class="text-xs font-bold text-emerald-600 mb-3">STEP 2. 設定基準條件並反推月用量</p>
+                        <div class="single-row-grid">
+                            <div style="flex: 0.5;">
+                                <label class="block text-[10px] font-bold text-gray-400 mb-1">管制別</label>
+                                <select id="rev_type" onchange="reverseCalculate()" class="input-field w-full px-1 py-1.5 border border-emerald-200 rounded bg-white text-xs text-center">
+                                    <option value="A">A (天數法)</option>
+                                    <option value="B (MOQ法)">B</option>
+                                </select>
+                            </div>
+                            <div style="flex: 0.7;">
+                                <label class="block text-[10px] font-bold text-gray-400 mb-1">交貨天數</label>
+                                <input type="number" id="rev_lead" value="34" oninput="reverseCalculate()" class="input-field w-full px-1 py-1.5 border border-emerald-200 rounded text-xs text-center">
+                            </div>
+                            <div style="flex: 0.7;">
+                                <label class="block text-[10px] font-bold text-gray-400 mb-1">安全天數</label>
+                                <input type="number" id="rev_safety" value="12" oninput="reverseCalculate()" class="input-field w-full px-1 py-1.5 border border-emerald-200 rounded text-xs text-center">
+                            </div>
+                            <div style="flex: 0.7;">
+                                <label class="block text-[10px] font-bold text-gray-400 mb-1">經濟量</label>
+                                <input type="number" id="rev_moq" value="0" oninput="reverseCalculate()" class="input-field w-full px-1 py-1.5 border border-emerald-200 rounded text-xs text-center">
+                            </div>
+                            <div class="bg-emerald-100 rounded px-1 pt-1 border border-emerald-200 shadow-inner">
+                                <label class="block text-[10px] font-bold text-emerald-700 mb-1">推算月用量</label>
+                                <input type="number" id="rev_usage_result" readonly class="w-full px-1 py-1.5 bg-transparent text-xs text-center font-black text-emerald-800 outline-none">
+                            </div>
+                        </div>
+                        <div class="mt-4 p-3 bg-white rounded border border-emerald-100 text-[11px] text-emerald-800">
+                            <strong>💡 邏輯說明：</strong><br>
+                            當管制別為 <span class="font-bold">A</span>：月用量 = 總可用量 / [(交貨天數 + 安全天數) / 30]<br>
+                            當管制別為 <span class="font-bold">B</span>：月用量 = 總可用量 (此時請購點即為月用量)
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end px-2">
+                <button onclick="resetReverse()" class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition font-bold text-sm shadow-md">
+                    重置數值
+                </button>
+            </div>
+        </section>
     </div>
 
     <script>
-        // === 修正：設定後端伺服器的完整網址 ===
-        // 請將此網址替換為您執行 app.py 的實際網址。
-        // 在一般情況下，如果後端伺服器運行在本地，這個網址通常是 
-        // http://127.0.0.1:5000。
-        const BACKEND_URL = 'http://127.0.0.1:5000';
+        const fieldNames = ['type', 'usage', 'lead', 'safety', 'cycle', 'pkg', 'moq', 'point', 'max'];
+        
+        function switchTab(tabId) {
+            document.getElementById('tab1').classList.add('hidden');
+            document.getElementById('tab2').classList.add('hidden');
+            document.getElementById(tabId).classList.remove('hidden');
+            
+            document.getElementById('btn_tab1').classList.remove('active');
+            document.getElementById('btn_tab2').classList.remove('active');
+            document.getElementById('btn_' + tabId).classList.add('active');
+        }
 
-        document.getElementById('pdf-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
+        function getEl(block, prefix, field) {
+            return document.getElementById(`${block}_${prefix}_${field}`);
+        }
 
-            const form = e.target;
-            const formData = new FormData(form);
-            const textInput = document.getElementById('text-input').value;
-            const fileInput = document.getElementById('file-input').files[0];
+        window.onload = () => {
+            handleLeadChange('b1', 'pre');
+            reverseCalculate();
+        };
 
-            // 檢查是否提供了資料
-            if (!textInput && !fileInput) {
-                alert('請輸入文字或上傳檔案。');
+        // --- 正向計算邏輯 ---
+        function handleLeadChange(block, prefix) {
+            const leadInput = getEl(block, prefix, 'lead');
+            const safetyInput = getEl(block, prefix, 'safety');
+            const lead = parseFloat(leadInput.value) || 0;
+            const suggestedSafety = Math.round(lead * 0.2 + 5);
+            safetyInput.value = suggestedSafety;
+
+            if (prefix === 'pre') syncAndCalculate(block, 'pre');
+            else calculate(block, 'post');
+        }
+
+        function syncAndCalculate(block, prefix) {
+            calculate(block, 'pre');
+            fieldNames.forEach(f => {
+                if (f !== 'point' && f !== 'max') {
+                    getEl(block, 'post', f).value = getEl(block, 'pre', f).value;
+                }
+            });
+            calculate(block, 'post');
+        }
+
+        function calculate(block, prefix) {
+            const type = getEl(block, prefix, 'type').value;
+            const usage = parseFloat(getEl(block, prefix, 'usage').value) || 0;
+            const lead = parseFloat(getEl(block, prefix, 'lead').value) || 0;
+            const safety = parseFloat(getEl(block, prefix, 'safety').value) || 0;
+            const cycle = parseFloat(getEl(block, prefix, 'cycle').value) || 0;
+            const pkg = parseFloat(getEl(block, prefix, 'pkg').value) || 1;
+            const moq = parseFloat(getEl(block, prefix, 'moq').value) || 0;
+
+            let rawPoint = 0, rawMax = 0;
+            if (type === 'A') {
+                rawPoint = (usage / 30) * (lead + safety);
+                rawMax = (usage / 30) * (lead + safety + cycle);
+            } else {
+                rawPoint = usage;
+                rawMax = usage + moq;
+            }
+            const effectivePkg = pkg > 0 ? pkg : 1;
+            getEl(block, prefix, 'point').value = Math.ceil(rawPoint / effectivePkg) * effectivePkg;
+            getEl(block, prefix, 'max').value = Math.ceil(rawMax / effectivePkg) * effectivePkg;
+
+            if (block === 'b1') {
+                checkStockAlert(block);
+                calculateOrder();
+            }
+        }
+
+        function calculateOrder() {
+            const stock = parseFloat(document.getElementById('curr_stock').value) || 0;
+            const order1 = parseFloat(document.getElementById('on_order_1').value) || 0;
+            const order2 = parseFloat(document.getElementById('on_order_2').value) || 0;
+            const order3 = parseFloat(document.getElementById('on_order_3').value) || 0;
+            const total = stock + order1 + order2 + order3;
+            document.getElementById('total_avail').value = total;
+
+            const postPoint = parseFloat(getEl('b1', 'post', 'point').value) || 0;
+            const postMax = parseFloat(getEl('b1', 'post', 'max').value) || 0;
+            const pkg = parseFloat(getEl('b1', 'post', 'pkg').value) || 1;
+            const suggestionEl = document.getElementById('order_suggestion');
+
+            if (postPoint <= 0 && total === 0) {
+                suggestionEl.innerHTML = "";
+                return;
+            }
+            if (total <= postPoint) {
+                const orderQty = Math.ceil((postMax - total) / pkg) * pkg;
+                suggestionEl.innerHTML = `🚨 建議請購：${orderQty}`;
+                suggestionEl.className = "h-10 flex items-center px-4 rounded font-bold text-[11px] bg-red-100 text-red-700 border border-red-200 shadow-sm";
+            } else {
+                suggestionEl.innerHTML = `✅ 庫存充足`;
+                suggestionEl.className = "h-10 flex items-center px-4 rounded font-bold text-[11px] bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-sm";
+            }
+        }
+
+        // --- 逆向計算邏輯 (區塊二) ---
+        function reverseCalculate() {
+            const stock = parseFloat(document.getElementById('rev_stock').value) || 0;
+            const transit = parseFloat(document.getElementById('rev_transit').value) || 0;
+            const total = stock + transit;
+            document.getElementById('rev_total').value = total;
+
+            const type = document.getElementById('rev_type').value;
+            const lead = parseFloat(document.getElementById('rev_lead').value) || 0;
+            const safety = parseFloat(document.getElementById('rev_safety').value) || 0;
+            const resultEl = document.getElementById('rev_usage_result');
+
+            if (total === 0) {
+                resultEl.value = 0;
                 return;
             }
 
-            // 顯示載入中訊息並隱藏其他區塊
-            document.getElementById('loading-message').classList.remove('hidden');
-            document.getElementById('download-section').classList.add('hidden');
-            form.querySelector('button').disabled = true;
-
-            try {
-                // 發送請求到後端
-                // === 修正：使用完整的後端網址 ===
-                const response = await fetch(BACKEND_URL + '/generate-pdf', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (response.ok) {
-                    // 成功時，建立一個 Blob URL 來下載檔案
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const downloadLink = document.getElementById('download-link');
-                    downloadLink.href = url;
-                    
-                    // 顯示下載區塊
-                    document.getElementById('download-section').classList.remove('hidden');
-                } else {
-                    // 處理錯誤
-                    const errorText = await response.text();
-                    alert('產生PDF時發生錯誤：' + errorText);
+            let calculatedUsage = 0;
+            if (type === 'A') {
+                // Point = (Usage / 30) * (Lead + Safety)
+                // Usage = (Point * 30) / (Lead + Safety)
+                const days = lead + safety;
+                if (days > 0) {
+                    calculatedUsage = (total * 30) / days;
                 }
-            } catch (error) {
-                console.error('Fetch error:', error);
-                alert('連線伺服器時發生錯誤。');
-            } finally {
-                // 完成後，隱藏載入中訊息並啟用按鈕
-                document.getElementById('loading-message').classList.add('hidden');
-                form.querySelector('button').disabled = false;
+            } else {
+                // 管制別 B，請購點即月用量
+                calculatedUsage = total;
             }
-        });
+
+            resultEl.value = Math.floor(calculatedUsage);
+        }
+
+        function checkStockAlert(block) {
+            const preMax = parseFloat(getEl(block, 'pre', 'max').value) || 0;
+            const postMax = parseFloat(getEl(block, 'post', 'max').value) || 0;
+            const alertContainer = document.getElementById(`${block}_alert_container`);
+            if (postMax > preMax) {
+                alertContainer.innerHTML = `<div class="text-lg font-black text-red-600 bg-red-50 border-l-4 border-red-500 py-2 px-4 rounded shadow-sm flex items-center gap-2 animate-pulse w-full">⚠️ 庫存增加 (${(postMax - preMax).toFixed(0)})!</div>`;
+            } else if (postMax < preMax) {
+                alertContainer.innerHTML = `<div class="text-lg font-black text-emerald-700 bg-emerald-50 border-l-4 border-emerald-500 py-2 px-4 rounded shadow-sm flex items-center gap-2 w-full">✅ 庫存降低 (${(preMax - postMax).toFixed(0)})!</div>`;
+            } else alertContainer.innerHTML = "";
+        }
+
+        function resetInputs(block) {
+            getEl(block, 'pre', 'usage').value = "";
+            getEl(block, 'pre', 'lead').value = "34";
+            getEl(block, 'pre', 'cycle').value = "30";
+            getEl(block, 'pre', 'pkg').value = "1";
+            getEl(block, 'pre', 'moq').value = "0";
+            handleLeadChange(block, 'pre');
+        }
+
+        function resetReverse() {
+            document.getElementById('rev_stock').value = "";
+            document.getElementById('rev_transit').value = "";
+            document.getElementById('rev_lead').value = "34";
+            document.getElementById('rev_safety').value = "12";
+            reverseCalculate();
+        }
     </script>
 </body>
 </html>
